@@ -35,17 +35,20 @@ public class OrderService {
     private final TradeRepository tradeRepository;
     private final MatchingStrategyFactory matchingStrategyFactory;
     private final SimpMessagingTemplate messagingTemplate;
+    private final PortfolioService portfolioService;
     
     private final Map<String, OrderBook> orderBooks = new ConcurrentHashMap<>();
     
     @Autowired
     public OrderService(OrderRepository orderRepository, TradeRepository tradeRepository, 
                         MatchingStrategyFactory matchingStrategyFactory,
-                        SimpMessagingTemplate messagingTemplate) {
+                        SimpMessagingTemplate messagingTemplate,
+                        PortfolioService portfolioService) {
         this.orderRepository = orderRepository;
         this.tradeRepository = tradeRepository;
         this.matchingStrategyFactory = matchingStrategyFactory;
         this.messagingTemplate = messagingTemplate;
+        this.portfolioService = portfolioService;
     }
     
     private OrderBook getOrderBook(String symbol) {
@@ -85,6 +88,9 @@ public class OrderService {
             tradeRepository.save(trade);
             String restingOrderId = trade.getBuyOrderId().equals(order.getOrderId()) ? trade.getSellOrderId() : trade.getBuyOrderId();
             orderRepository.findById(restingOrderId).ifPresent(orderRepository::save);
+            
+            // Update Portfolios
+            portfolioService.processTrade(trade);
             
             // Publish trade via WebSocket
             messagingTemplate.convertAndSend("/topic/trades", trade);
