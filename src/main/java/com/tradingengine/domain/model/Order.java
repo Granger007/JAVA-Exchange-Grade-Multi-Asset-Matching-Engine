@@ -3,6 +3,12 @@ package com.tradingengine.domain.model;
 import java.time.Instant;
 import java.util.Objects;
 
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+
 /**
  * ORDER - Core domain entity representing a trading order
  * 
@@ -10,27 +16,46 @@ import java.util.Objects;
  * SOLID: SRP - Only responsible for order state management
  * GRASP: Information Expert - Owns order validation logic
  */
+@Entity
+@Table(name = "orders")
 public class Order {
-    private final String orderId;
-    private final String symbol;
-    private final double price;
-    private final OrderSide side;
-    private final String traderId;
-    private final Instant createdAt;
+    @Id
+    private String orderId;
+    private String symbol;
+    private double price;
+    private double stopPrice;
+    private long originalQuantity;
+    
+    @Enumerated(EnumType.STRING)
+    private OrderSide side;
+    
+    @Enumerated(EnumType.STRING)
+    private OrderType type;
+    
+    private String traderId;
+    private Instant createdAt;
     
     private long quantity;
+    
+    @Enumerated(EnumType.STRING)
     private OrderStatus status;
+    
     private Instant lastModified;
+    
+    protected Order() {} // JPA requires no-arg constructor
 
-    public Order(String orderId, String symbol, double price, long quantity, 
-                 OrderSide side, String traderId) {
-        validateOrderData(orderId, symbol, price, quantity, side, traderId);
+    public Order(String orderId, String symbol, double price, double stopPrice, long quantity, 
+                 OrderSide side, OrderType type, String traderId) {
+        validateOrderData(orderId, symbol, price, stopPrice, quantity, side, type, traderId);
         
         this.orderId = orderId;
         this.symbol = symbol;
-        this.price = price;
+        this.price = type == OrderType.MARKET ? 0.0 : price; // Market orders can ignore price
+        this.stopPrice = stopPrice;
+        this.originalQuantity = quantity;
         this.quantity = quantity;
         this.side = side;
+        this.type = type;
         this.traderId = traderId;
         this.status = OrderStatus.NEW;
         this.createdAt = Instant.now();
@@ -66,18 +91,30 @@ public class Order {
         this.status = OrderStatus.REJECTED;
         this.lastModified = Instant.now();
     }
+    
+    public void convertToMarket() {
+        this.type = OrderType.MARKET;
+        this.price = 0.0;
+        this.lastModified = Instant.now();
+    }
 
     // Validation logic - Information Expert principle
-    private void validateOrderData(String orderId, String symbol, double price, 
-                                  long quantity, OrderSide side, String traderId) {
+    private void validateOrderData(String orderId, String symbol, double price, double stopPrice,
+                                  long quantity, OrderSide side, OrderType type, String traderId) {
         if (orderId == null || orderId.trim().isEmpty()) {
             throw new IllegalArgumentException("Order ID cannot be null or empty");
         }
         if (symbol == null || symbol.trim().isEmpty()) {
             throw new IllegalArgumentException("Symbol cannot be null or empty");
         }
-        if (price <= 0) {
-            throw new IllegalArgumentException("Price must be positive");
+        if (type == null) {
+            throw new IllegalArgumentException("Order type cannot be null");
+        }
+        if (type == OrderType.LIMIT && price <= 0) {
+            throw new IllegalArgumentException("Price must be positive for limit orders");
+        }
+        if (type == OrderType.STOP_LOSS && stopPrice <= 0) {
+            throw new IllegalArgumentException("Stop price must be positive for stop orders");
         }
         if (quantity <= 0) {
             throw new IllegalArgumentException("Quantity must be positive");
@@ -106,8 +143,11 @@ public class Order {
     public String getOrderId() { return orderId; }
     public String getSymbol() { return symbol; }
     public double getPrice() { return price; }
+    public double getStopPrice() { return stopPrice; }
     public long getQuantity() { return quantity; }
+    public long getOriginalQuantity() { return originalQuantity; }
     public OrderSide getSide() { return side; }
+    public OrderType getType() { return type; }
     public String getTraderId() { return traderId; }
     public OrderStatus getStatus() { return status; }
     public Instant getCreatedAt() { return createdAt; }
@@ -135,8 +175,8 @@ public class Order {
 
     @Override
     public String toString() {
-        return String.format("Order{id='%s', symbol='%s', side=%s, price=%.2f, " +
-                           "quantity=%d, status=%s, trader='%s'}",
-                           orderId, symbol, side, price, quantity, status, traderId);
+        return String.format("Order{id='%s', symbol='%s', side=%s, type=%s, price=%.2f, stopPrice=%.2f, " +
+                           "quantity=%d, originalQuantity=%d, status=%s, trader='%s'}",
+                           orderId, symbol, side, type, price, stopPrice, quantity, originalQuantity, status, traderId);
     }
 }

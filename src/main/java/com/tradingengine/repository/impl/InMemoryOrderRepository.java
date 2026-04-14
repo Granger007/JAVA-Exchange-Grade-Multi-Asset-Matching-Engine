@@ -2,7 +2,6 @@ package com.tradingengine.repository.impl;
 
 import com.tradingengine.domain.model.Order;
 import com.tradingengine.repository.OrderRepository;
-import org.springframework.stereotype.Repository;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -13,7 +12,6 @@ import java.util.concurrent.ConcurrentHashMap;
  * GOOD DESIGN: Implements repository interface, clean separation
  * In production, this would be replaced with JPA/JDBC implementation
  */
-@Repository
 public class InMemoryOrderRepository implements OrderRepository {
     
     private final Map<String, Order> orders = new ConcurrentHashMap<>();

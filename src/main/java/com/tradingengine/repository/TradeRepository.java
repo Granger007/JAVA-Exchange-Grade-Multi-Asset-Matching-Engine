@@ -64,4 +64,9 @@ public interface TradeRepository {
      * Delete trade by ID
      */
     boolean deleteById(String tradeId);
+
+    /**
+     * Delete all trades
+     */
+    void deleteAll();
 }

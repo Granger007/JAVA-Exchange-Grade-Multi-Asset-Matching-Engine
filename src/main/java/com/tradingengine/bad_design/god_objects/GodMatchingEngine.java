@@ -159,6 +159,8 @@ public class GodMatchingEngine {
         trade.tradeId = UUID.randomUUID().toString();
         trade.buyOrderId = order1.side.equals("BUY") ? order1.orderId : order2.orderId;
         trade.sellOrderId = order1.side.equals("SELL") ? order1.orderId : order2.orderId;
+        trade.buyTraderId = order1.side.equals("BUY") ? order1.traderId : order2.traderId;
+        trade.sellTraderId = order1.side.equals("SELL") ? order1.traderId : order2.traderId;
         trade.price = order2.price; // Use resting order price
         trade.quantity = Math.min(order1.quantity, order2.quantity);
         trade.symbol = order1.symbol;

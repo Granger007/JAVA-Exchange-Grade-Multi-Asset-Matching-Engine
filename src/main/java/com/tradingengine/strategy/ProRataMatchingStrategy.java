@@ -8,16 +8,13 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * FIFO MATCHING STRATEGY - Price-Time Priority matching
+ * PRO RATA MATCHING STRATEGY
  * 
- * GOOD DESIGN: Clear responsibility, follows price-time priority rules
- * SOLID: SRP - Only handles FIFO matching logic
- * LSP - Can be substituted with any other MatchingStrategy
- * OCP - New strategies can be added without modifying this
+ * Matches orders proportionally based on their size at each price level.
  */
 @Component
-public class FIFOMatchingStrategy implements MatchingStrategy {
-    
+public class ProRataMatchingStrategy implements MatchingStrategy {
+
     @Override
     public List<Trade> match(Order incomingOrder, OrderBook orderBook) {
         List<Trade> trades = new ArrayList<>();
@@ -30,34 +27,68 @@ public class FIFOMatchingStrategy implements MatchingStrategy {
         
         for (PriceLevel level : oppositeLevels) {
             if (!canMatchAtPrice(incomingOrder, level.getPrice())) {
-                break; // No more favorable prices
+                break;
             }
             
             List<Order> ordersAtLevel = new ArrayList<>(level.getOrders());
+            long totalQuantityAtLevel = level.getTotalQuantity();
             
-            for (Order restingOrder : ordersAtLevel) {
-                if (!restingOrder.isActive() || incomingOrder.getQuantity() == 0) {
+            if (totalQuantityAtLevel == 0) continue;
+            
+            // Calculate proportional match for each order
+            long remainingIncomingQuantity = incomingOrder.getQuantity();
+            double tradePrice = level.getPrice();
+            
+            int activeOrdersCount = 0;
+            for (Order order : ordersAtLevel) {
+                if (order.isActive()) activeOrdersCount++;
+            }
+            
+            if (activeOrdersCount == 0) continue;
+            
+            for (int i = 0; i < ordersAtLevel.size(); i++) {
+                Order restingOrder = ordersAtLevel.get(i);
+                
+                if (!restingOrder.isActive() || remainingIncomingQuantity <= 0) {
                     continue;
                 }
                 
-                long tradeQuantity = Math.min(incomingOrder.getQuantity(), restingOrder.getQuantity());
-                double tradePrice = level.getPrice(); // Use resting order price
+                // ProRata logic
+                long tradeQuantity = 0;
                 
-                // Execute trade
+                // If it's the last active order, match the remaining to prevent rounding drop-offs
+                boolean isLastActive = (i == ordersAtLevel.size() - 1); // Simple approximation
+                
+                if (isLastActive) {
+                    tradeQuantity = Math.min(remainingIncomingQuantity, restingOrder.getQuantity());
+                } else {
+                    double proportion = (double) restingOrder.getQuantity() / totalQuantityAtLevel;
+                    tradeQuantity = (long) Math.floor(proportion * incomingOrder.getOriginalQuantity());
+                    
+                    // Don't execute more than what's available
+                    tradeQuantity = Math.min(tradeQuantity, remainingIncomingQuantity);
+                    tradeQuantity = Math.min(tradeQuantity, restingOrder.getQuantity());
+                    
+                    if (tradeQuantity == 0 && remainingIncomingQuantity > 0) {
+                        tradeQuantity = 1; // Minimum 1 unit if proportional logic rounds to 0
+                    }
+                }
+                
+                if (tradeQuantity <= 0) continue;
+
                 Trade trade = executeTrade(incomingOrder, restingOrder, tradePrice, tradeQuantity);
                 trades.add(trade);
                 
-                // Update order quantities and status
                 incomingOrder.execute(tradeQuantity, tradePrice);
                 restingOrder.execute(tradeQuantity, tradePrice);
+                remainingIncomingQuantity -= tradeQuantity;
                 
-                // Remove filled orders from book
                 if (restingOrder.isFilled()) {
                     orderBook.removeOrder(restingOrder.getOrderId());
                 }
                 
                 if (incomingOrder.getQuantity() == 0) {
-                    break; // Incoming order fully filled
+                    break;
                 }
             }
         }
@@ -75,13 +106,12 @@ public class FIFOMatchingStrategy implements MatchingStrategy {
     
     private boolean canMatchAtPrice(Order incomingOrder, double price) {
         if (incomingOrder.getType() == OrderType.MARKET) {
-            return true; // Market orders match at any available price
+            return true;
         }
-        
         if (incomingOrder.getSide() == OrderSide.BUY) {
-            return incomingOrder.getPrice() >= price; // Buy order matches at or below limit
+            return incomingOrder.getPrice() >= price;
         } else {
-            return incomingOrder.getPrice() <= price; // Sell order matches at or above limit
+            return incomingOrder.getPrice() <= price;
         }
     }
     
@@ -110,6 +140,6 @@ public class FIFOMatchingStrategy implements MatchingStrategy {
     
     @Override
     public String getStrategyName() {
-        return "FIFO";
+        return "PRORATA";
     }
 }

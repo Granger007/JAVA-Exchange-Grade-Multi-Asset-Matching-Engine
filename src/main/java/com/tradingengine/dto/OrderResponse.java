@@ -15,22 +15,26 @@ public class OrderResponse {
     private final String orderId;
     private final String symbol;
     private final double price;
+    private final double stopPrice;
     private final long quantity;
     private final String side;
+    private final String type;
     private final String status;
     private final String traderId;
     private final Instant createdAt;
     private final Instant lastModified;
     private final List<Trade> trades;
 
-    public OrderResponse(String orderId, String symbol, double price, long quantity,
-                        String side, String status, String traderId,
+    public OrderResponse(String orderId, String symbol, double price, double stopPrice, long quantity,
+                        String side, String type, String status, String traderId,
                         Instant createdAt, Instant lastModified, List<Trade> trades) {
         this.orderId = orderId;
         this.symbol = symbol;
         this.price = price;
+        this.stopPrice = stopPrice;
         this.quantity = quantity;
         this.side = side;
+        this.type = type;
         this.status = status;
         this.traderId = traderId;
         this.createdAt = createdAt;
@@ -42,8 +46,10 @@ public class OrderResponse {
     public String getOrderId() { return orderId; }
     public String getSymbol() { return symbol; }
     public double getPrice() { return price; }
+    public double getStopPrice() { return stopPrice; }
     public long getQuantity() { return quantity; }
     public String getSide() { return side; }
+    public String getType() { return type; }
     public String getStatus() { return status; }
     public String getTraderId() { return traderId; }
     public Instant getCreatedAt() { return createdAt; }
@@ -52,8 +58,8 @@ public class OrderResponse {
 
     @Override
     public String toString() {
-        return String.format("OrderResponse{id='%s', symbol='%s', side=%s, price=%.2f, " +
+        return String.format("OrderResponse{id='%s', symbol='%s', side=%s, type=%s, price=%.2f, stopPrice=%.2f, " +
                            "quantity=%d, status=%s, trades=%d}",
-                           orderId, symbol, side, price, quantity, status, trades.size());
+                           orderId, symbol, side, type, price, stopPrice, quantity, status, trades.size());
     }
 }

@@ -1,5 +1,10 @@
 package com.tradingengine.controller;
 
+import com.tradingengine.domain.model.Portfolio;
+import com.tradingengine.domain.model.Trade;
+import com.tradingengine.repository.TradeRepository;
+import com.tradingengine.service.OrderService;
+import com.tradingengine.service.PortfolioService;
 import com.tradingengine.simulation.SimulationEngine;
 import com.tradingengine.simulation.TradingAgent;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,10 +28,19 @@ import java.util.Map;
 public class SimulationController {
     
     private final SimulationEngine simulationEngine;
+    private final TradeRepository tradeRepository;
+    private final PortfolioService portfolioService;
+    private final OrderService orderService;
     
     @Autowired
-    public SimulationController(SimulationEngine simulationEngine) {
+    public SimulationController(SimulationEngine simulationEngine, 
+                                TradeRepository tradeRepository,
+                                PortfolioService portfolioService,
+                                OrderService orderService) {
         this.simulationEngine = simulationEngine;
+        this.tradeRepository = tradeRepository;
+        this.portfolioService = portfolioService;
+        this.orderService = orderService;
     }
     
     /**
@@ -37,13 +51,16 @@ public class SimulationController {
         List<Map<String, Object>> agents = new ArrayList<>();
         
         for (TradingAgent agent : simulationEngine.getAgents()) {
+            Portfolio portfolio = portfolioService.getPortfolio(agent.getAgentId());
             Map<String, Object> agentData = new HashMap<>();
             agentData.put("id", agent.getName());
             agentData.put("symbol", agent.getSymbol());
             agentData.put("active", agent.isActive());
-            agentData.put("tradeCount", (int)(Math.random() * 20)); // Mock trade count
-            agentData.put("position", (long)(Math.random() * 1000 - 500)); // Mock position
-            agentData.put("pnl", Math.random() * 10000 - 5000); // Mock P&L
+            
+            List<Trade> agentTrades = tradeRepository.findByTraderId(agent.getAgentId());
+            agentData.put("tradeCount", agentTrades.size());
+            agentData.put("position", portfolio.getPositions().getOrDefault(agent.getSymbol(), 0L));
+            agentData.put("pnl", portfolio.getBalance() - 100000.0); // Assuming 100k starting balance
             agents.add(agentData);
         }
         
@@ -51,27 +68,55 @@ public class SimulationController {
     }
     
     /**
-     * Get trades for a symbol (mock data for now)
+     * Get trades for a symbol
      */
     @GetMapping("/trades/{symbol}")
     public ResponseEntity<List<Map<String, Object>>> getTrades(@PathVariable String symbol) {
-        List<Map<String, Object>> trades = new ArrayList<>();
+        List<Trade> trades = tradeRepository.findRecentTrades(symbol, 50);
+        List<Map<String, Object>> tradeList = new ArrayList<>();
         
-        // Generate some mock trades for demonstration
-        for (int i = 0; i < 5; i++) {
-            Map<String, Object> trade = new HashMap<>();
-            trade.put("price", symbol.equals("AAPL") ? 150.0 + Math.random() * 10 : 45000.0 + Math.random() * 1000);
-            trade.put("quantity", (long)(Math.random() * 100 + 10));
-            trade.put("buyerTraderId", "Agent-" + (int)(Math.random() * 6));
-            trade.put("sellerTraderId", "Agent-" + (int)(Math.random() * 6));
-            trade.put("buyOrderId", "buy-" + System.currentTimeMillis());
-            trade.put("sellOrderId", "sell-" + System.currentTimeMillis());
-            trade.put("timestamp", System.currentTimeMillis());
-            trade.put("buyerOriginalPrice", trade.get("price"));
-            trade.put("sellerOriginalPrice", trade.get("price"));
-            trades.add(trade);
+        for (Trade trade : trades) {
+            Map<String, Object> tradeData = new HashMap<>();
+            tradeData.put("price", trade.getPrice());
+            tradeData.put("quantity", trade.getQuantity());
+            
+            // Resolve agent names for better UI display
+            String buyerName = simulationEngine.getAgents().stream()
+                .filter(a -> a.getAgentId().equals(trade.getBuyTraderId()))
+                .map(TradingAgent::getName)
+                .findFirst()
+                .orElse(trade.getBuyTraderId().length() > 8 ? trade.getBuyTraderId().substring(0, 8) : trade.getBuyTraderId());
+                
+            String sellerName = simulationEngine.getAgents().stream()
+                .filter(a -> a.getAgentId().equals(trade.getSellTraderId()))
+                .map(TradingAgent::getName)
+                .findFirst()
+                .orElse(trade.getSellTraderId().length() > 8 ? trade.getSellTraderId().substring(0, 8) : trade.getSellTraderId());
+
+            tradeData.put("buyerTraderId", buyerName);
+            tradeData.put("sellerTraderId", sellerName);
+            tradeData.put("buyOrderId", trade.getBuyOrderId());
+            tradeData.put("sellOrderId", trade.getSellOrderId());
+            tradeData.put("timestamp", trade.getExecutedAt().toEpochMilli());
+            
+            // These would normally come from the original orders, for demo we'll use trade price
+            tradeData.put("buyerOriginalPrice", trade.getPrice());
+            tradeData.put("sellerOriginalPrice", trade.getPrice());
+            tradeList.add(tradeData);
         }
         
-        return ResponseEntity.ok(trades);
+        return ResponseEntity.ok(tradeList);
+    }
+
+    /**
+     * Restart the simulation
+     */
+    @PostMapping("/restart")
+    public ResponseEntity<Void> restartSimulation() {
+        orderService.clearAllOrders();
+        tradeRepository.deleteAll();
+        portfolioService.clearAllPortfolios();
+        simulationEngine.restartSimulation();
+        return ResponseEntity.ok().build();
     }
 }

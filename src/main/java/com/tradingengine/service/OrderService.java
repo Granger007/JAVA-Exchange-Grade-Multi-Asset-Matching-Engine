@@ -10,8 +10,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.ArrayList;
+import com.tradingengine.strategy.MatchingStrategy;
+import com.tradingengine.strategy.MatchingStrategyFactory;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 /**
  * ORDER SERVICE - Business logic for order operations
@@ -26,14 +34,31 @@ import java.util.UUID;
 public class OrderService {
     
     private final OrderRepository orderRepository;
-    private final TradeRepository tradeRepository; // TODO: Use for saving trades when matching is implemented (currently unused placeholder)
+    private final TradeRepository tradeRepository;
+    private final MatchingStrategyFactory matchingStrategyFactory;
+    private final SimpMessagingTemplate messagingTemplate;
+    private final PortfolioService portfolioService;
+    
+    private final Map<String, OrderBook> orderBooks = new ConcurrentHashMap<>();
     
     @Autowired
-    public OrderService(OrderRepository orderRepository, TradeRepository tradeRepository) {
+    public OrderService(OrderRepository orderRepository, TradeRepository tradeRepository, 
+                        MatchingStrategyFactory matchingStrategyFactory,
+                        SimpMessagingTemplate messagingTemplate,
+                        PortfolioService portfolioService) {
         this.orderRepository = orderRepository;
         this.tradeRepository = tradeRepository;
+        this.matchingStrategyFactory = matchingStrategyFactory;
+        this.messagingTemplate = messagingTemplate;
+        this.portfolioService = portfolioService;
     }
     
+    private OrderBook getOrderBook(String symbol) {
+        return orderBooks.computeIfAbsent(symbol, OrderBook::new);
+    }
+    
+    private final Map<String, List<Order>> stopOrders = new ConcurrentHashMap<>();
+
     /**
      * Place new order
      * 
@@ -45,12 +70,71 @@ public class OrderService {
         
         // Create order
         Order order = createOrderFromRequest(request);
+        orderRepository.save(order); // Save initial state
         
-        // For now, return a simple response without matching
-        // In a full implementation, this would delegate to MatchingEngine
+        if (order.getType() == OrderType.STOP_LOSS) {
+            stopOrders.computeIfAbsent(order.getSymbol(), k -> new CopyOnWriteArrayList<>()).add(order);
+            return createOrderResponse(order, List.of());
+        }
+        
+        List<Trade> trades = executeMatching(order);
+        return createOrderResponse(order, trades);
+    }
+    
+    private List<Trade> executeMatching(Order order) {
+        OrderBook orderBook = getOrderBook(order.getSymbol());
+        MatchingStrategy matchingStrategy = matchingStrategyFactory.getStrategy("FIFO"); // Defaulting to FIFO for now
+        List<Trade> trades = matchingStrategy.match(order, orderBook);
+        
+        if (order.getType() == OrderType.MARKET) {
+            if (order.getQuantity() > 0 && order.isActive()) {
+                order.cancel(); 
+            }
+        } else if (order.isActive() && order.getQuantity() > 0) {
+            orderBook.addOrder(order);
+        }
+        
+        // Save trades and update resting orders
+        for (Trade trade : trades) {
+            tradeRepository.save(trade);
+            String restingOrderId = trade.getBuyOrderId().equals(order.getOrderId()) ? trade.getSellOrderId() : trade.getBuyOrderId();
+            orderRepository.findById(restingOrderId).ifPresent(orderRepository::save);
+            
+            portfolioService.processTrade(trade);
+            messagingTemplate.convertAndSend("/topic/trades", trade);
+            
+            checkStopOrders(trade);
+        }
+        
+        // Save final state of incoming order
         orderRepository.save(order);
         
-        return createOrderResponse(order, List.of());
+        // Publish OrderBook update
+        publishOrderBookUpdate(orderBook);
+        
+        return trades;
+    }
+    
+    private void checkStopOrders(Trade trade) {
+        List<Order> list = stopOrders.get(trade.getSymbol());
+        if (list == null || list.isEmpty()) return;
+        
+        List<Order> triggered = new ArrayList<>();
+        for (Order so : list) {
+            if (!so.isActive()) continue;
+            
+            if (so.getSide() == OrderSide.SELL && trade.getPrice() <= so.getStopPrice()) {
+                triggered.add(so);
+            } else if (so.getSide() == OrderSide.BUY && trade.getPrice() >= so.getStopPrice()) {
+                triggered.add(so);
+            }
+        }
+        
+        for (Order so : triggered) {
+            list.remove(so);
+            so.convertToMarket();
+            executeMatching(so);
+        }
     }
     
     /**
@@ -70,8 +154,14 @@ public class OrderService {
             return false; // Cannot cancel inactive orders
         }
         
+        // Remove from order book
+        OrderBook orderBook = getOrderBook(order.getSymbol());
+        orderBook.removeOrder(orderId);
+        
         order.cancel();
         orderRepository.save(order); // Update status
+        
+        publishOrderBookUpdate(orderBook);
         
         return true;
     }
@@ -112,6 +202,12 @@ public class OrderService {
                 .map(this::createOrderResponse)
                 .toList();
     }
+
+    public void clearAllOrders() {
+        orderRepository.deleteAll();
+        orderBooks.clear();
+        stopOrders.clear();
+    }
     
     // Private helper methods
     private void validateOrderRequest(OrderRequest request) {
@@ -135,14 +231,35 @@ public class OrderService {
         }
     }
     
+    private void publishOrderBookUpdate(OrderBook orderBook) {
+        // Simplified order book representation for WebSocket clients
+        Map<String, Object> update = new HashMap<>();
+        update.put("symbol", orderBook.getSymbol());
+        update.put("bestBid", orderBook.getBestBid());
+        update.put("bestAsk", orderBook.getBestAsk());
+        update.put("midPrice", orderBook.getMidPrice());
+        update.put("spread", orderBook.getSpread());
+        
+        messagingTemplate.convertAndSend("/topic/orderbook/" + orderBook.getSymbol(), (Object) update);
+        messagingTemplate.convertAndSend("/topic/orderbook", (Object) update);
+    }
+    
     private Order createOrderFromRequest(OrderRequest request) {
         String orderId = UUID.randomUUID().toString();
+        
+        OrderType type = OrderType.LIMIT;
+        if (request.getType() != null && !request.getType().trim().isEmpty()) {
+            type = OrderType.valueOf(request.getType().toUpperCase());
+        }
+        
         return new Order(
             orderId,
             request.getSymbol(),
             request.getPrice(),
+            request.getStopPrice(),
             request.getQuantity(),
             OrderSide.valueOf(request.getSide().toUpperCase()),
+            type,
             request.getTraderId()
         );
     }
@@ -156,8 +273,10 @@ public class OrderService {
             order.getOrderId(),
             order.getSymbol(),
             order.getPrice(),
-            order.getQuantity(),
+            order.getStopPrice(),
+            order.getOriginalQuantity(), // Use original quantity to show what was requested
             order.getSide().toString(),
+            order.getType().toString(),
             order.getStatus().toString(),
             order.getTraderId(),
             order.getCreatedAt(),
