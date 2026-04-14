@@ -10,8 +10,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import com.tradingengine.strategy.MatchingStrategy;
 
 /**
  * ORDER SERVICE - Business logic for order operations
@@ -26,12 +29,20 @@ import java.util.UUID;
 public class OrderService {
     
     private final OrderRepository orderRepository;
-    private final TradeRepository tradeRepository; // TODO: Use for saving trades when matching is implemented (currently unused placeholder)
+    private final TradeRepository tradeRepository;
+    private final MatchingStrategy matchingStrategy;
+    
+    private final Map<String, OrderBook> orderBooks = new ConcurrentHashMap<>();
     
     @Autowired
-    public OrderService(OrderRepository orderRepository, TradeRepository tradeRepository) {
+    public OrderService(OrderRepository orderRepository, TradeRepository tradeRepository, MatchingStrategy matchingStrategy) {
         this.orderRepository = orderRepository;
         this.tradeRepository = tradeRepository;
+        this.matchingStrategy = matchingStrategy;
+    }
+    
+    private OrderBook getOrderBook(String symbol) {
+        return orderBooks.computeIfAbsent(symbol, OrderBook::new);
     }
     
     /**
@@ -45,12 +56,28 @@ public class OrderService {
         
         // Create order
         Order order = createOrderFromRequest(request);
+        orderRepository.save(order); // Save initial state
         
-        // For now, return a simple response without matching
-        // In a full implementation, this would delegate to MatchingEngine
+        OrderBook orderBook = getOrderBook(order.getSymbol());
+        
+        // Delegate to MatchingEngine/Strategy
+        List<Trade> trades = matchingStrategy.match(order, orderBook);
+        
+        if (order.isActive() && order.getQuantity() > 0) {
+            orderBook.addOrder(order);
+        }
+        
+        // Save trades and update resting orders
+        for (Trade trade : trades) {
+            tradeRepository.save(trade);
+            String restingOrderId = trade.getBuyOrderId().equals(order.getOrderId()) ? trade.getSellOrderId() : trade.getBuyOrderId();
+            orderRepository.findById(restingOrderId).ifPresent(orderRepository::save);
+        }
+        
+        // Save final state of incoming order
         orderRepository.save(order);
         
-        return createOrderResponse(order, List.of());
+        return createOrderResponse(order, trades);
     }
     
     /**
@@ -69,6 +96,10 @@ public class OrderService {
         if (!order.isActive()) {
             return false; // Cannot cancel inactive orders
         }
+        
+        // Remove from order book
+        OrderBook orderBook = getOrderBook(order.getSymbol());
+        orderBook.removeOrder(orderId);
         
         order.cancel();
         orderRepository.save(order); // Update status
