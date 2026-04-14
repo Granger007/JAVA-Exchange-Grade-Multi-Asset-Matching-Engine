@@ -5,23 +5,32 @@ import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.Objects;
 
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+
 /**
  * TRADE - Immutable domain entity representing executed trade
  * 
  * GOOD DESIGN: Immutable after creation, proper value object semantics
  * GRASP: Creator - MatchingEngine creates trades, Information Expert for trade calculations
  */
+@Entity
+@Table(name = "trades")
 public class Trade {
-    private final String tradeId;
-    private final String buyOrderId;
-    private final String sellOrderId;
-    private final String buyTraderId;
-    private final String sellTraderId;
-    private final String symbol;
-    private final double price;
-    private final long quantity;
-    private final double notionalValue;
-    private final Instant executedAt;
+    @Id
+    private String tradeId;
+    private String buyOrderId;
+    private String sellOrderId;
+    private String buyTraderId;
+    private String sellTraderId;
+    private String symbol;
+    private double price;
+    private long quantity;
+    private double notionalValue;
+    private Instant executedAt;
+    
+    protected Trade() {} // JPA requires no-arg constructor
 
     public Trade(String tradeId, String buyOrderId, String sellOrderId,
                  String buyTraderId, String sellTraderId, String symbol,

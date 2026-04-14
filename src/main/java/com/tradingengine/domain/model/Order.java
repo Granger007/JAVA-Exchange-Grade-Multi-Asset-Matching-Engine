@@ -3,6 +3,12 @@ package com.tradingengine.domain.model;
 import java.time.Instant;
 import java.util.Objects;
 
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+
 /**
  * ORDER - Core domain entity representing a trading order
  * 
@@ -10,19 +16,32 @@ import java.util.Objects;
  * SOLID: SRP - Only responsible for order state management
  * GRASP: Information Expert - Owns order validation logic
  */
+@Entity
+@Table(name = "orders")
 public class Order {
-    private final String orderId;
-    private final String symbol;
-    private final double price;
-    private final long originalQuantity;
-    private final OrderSide side;
-    private final OrderType type;
-    private final String traderId;
-    private final Instant createdAt;
+    @Id
+    private String orderId;
+    private String symbol;
+    private double price;
+    private long originalQuantity;
+    
+    @Enumerated(EnumType.STRING)
+    private OrderSide side;
+    
+    @Enumerated(EnumType.STRING)
+    private OrderType type;
+    
+    private String traderId;
+    private Instant createdAt;
     
     private long quantity;
+    
+    @Enumerated(EnumType.STRING)
     private OrderStatus status;
+    
     private Instant lastModified;
+    
+    protected Order() {} // JPA requires no-arg constructor
 
     public Order(String orderId, String symbol, double price, long quantity, 
                  OrderSide side, OrderType type, String traderId) {

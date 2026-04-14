@@ -13,7 +13,6 @@ import java.util.concurrent.ConcurrentHashMap;
  * GOOD DESIGN: Implements repository interface, clean separation
  * In production, this would be replaced with JPA/JDBC implementation
  */
-@Repository
 public class InMemoryOrderRepository implements OrderRepository {
     
     private final Map<String, Order> orders = new ConcurrentHashMap<>();
