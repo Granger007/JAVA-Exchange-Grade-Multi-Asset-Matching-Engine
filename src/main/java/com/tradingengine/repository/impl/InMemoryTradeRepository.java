@@ -14,7 +14,6 @@ import java.util.concurrent.ConcurrentHashMap;
  * GOOD DESIGN: Implements repository interface, clean separation
  * In production, this would be replaced with JPA/JDBC implementation
  */
-@Repository
 public class InMemoryTradeRepository implements TradeRepository {
     
     private final Map<String, Trade> trades = new ConcurrentHashMap<>();
