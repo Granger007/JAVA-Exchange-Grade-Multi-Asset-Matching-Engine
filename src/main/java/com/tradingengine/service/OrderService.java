@@ -3,6 +3,7 @@ package com.tradingengine.service;
 import com.tradingengine.domain.model.*;
 import com.tradingengine.dto.OrderRequest;
 import com.tradingengine.dto.OrderResponse;
+import com.tradingengine.dto.OrderBookView;
 import com.tradingengine.repository.OrderRepository;
 import com.tradingengine.repository.TradeRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -207,6 +208,59 @@ public class OrderService {
         orderRepository.deleteAll();
         orderBooks.clear();
         stopOrders.clear();
+    }
+    
+    /**
+     * Get order book view for API representation
+     * 
+     * @param symbol Trading symbol
+     * @return Order book view with aggregated price levels
+     */
+    public OrderBookView getOrderBookView(String symbol) {
+        List<OrderResponse> activeOrders = getActiveOrders(symbol);
+        
+        List<OrderBookView.PriceLevelView> bids = aggregateOrdersBySide(activeOrders, "BUY");
+        List<OrderBookView.PriceLevelView> asks = aggregateOrdersBySide(activeOrders, "SELL");
+        
+        return new OrderBookView(symbol, bids, asks);
+    }
+    
+    /**
+     * Aggregate orders by side into price levels
+     * 
+     * @param orders List of orders to aggregate
+     * @param side Order side (BUY/SELL)
+     * @return List of price level views
+     */
+    private List<OrderBookView.PriceLevelView> aggregateOrdersBySide(List<OrderResponse> orders, String side) {
+        Map<Double, PriceLevelData> priceLevels = new HashMap<>();
+        
+        for (OrderResponse order : orders) {
+            if (order.getSide().equals(side)) {
+                priceLevels.computeIfAbsent(order.getPrice(), k -> new PriceLevelData())
+                          .addOrder(order);
+            }
+        }
+        
+        return priceLevels.entrySet().stream()
+                .map(entry -> new OrderBookView.PriceLevelView(
+                        entry.getKey(),
+                        entry.getValue().totalQuantity,
+                        entry.getValue().orderCount))
+                .toList();
+    }
+    
+    /**
+     * Helper class for price level aggregation
+     */
+    private static class PriceLevelData {
+        long totalQuantity = 0;
+        int orderCount = 0;
+        
+        void addOrder(OrderResponse order) {
+            totalQuantity += order.getQuantity();
+            orderCount++;
+        }
     }
     
     // Private helper methods
