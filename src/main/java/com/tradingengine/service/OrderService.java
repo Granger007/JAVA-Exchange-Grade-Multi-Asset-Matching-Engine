@@ -11,11 +11,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import com.tradingengine.strategy.MatchingStrategy;
 import com.tradingengine.strategy.MatchingStrategyFactory;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 /**
  * ORDER SERVICE - Business logic for order operations
@@ -32,14 +34,18 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final TradeRepository tradeRepository;
     private final MatchingStrategyFactory matchingStrategyFactory;
+    private final SimpMessagingTemplate messagingTemplate;
     
     private final Map<String, OrderBook> orderBooks = new ConcurrentHashMap<>();
     
     @Autowired
-    public OrderService(OrderRepository orderRepository, TradeRepository tradeRepository, MatchingStrategyFactory matchingStrategyFactory) {
+    public OrderService(OrderRepository orderRepository, TradeRepository tradeRepository, 
+                        MatchingStrategyFactory matchingStrategyFactory,
+                        SimpMessagingTemplate messagingTemplate) {
         this.orderRepository = orderRepository;
         this.tradeRepository = tradeRepository;
         this.matchingStrategyFactory = matchingStrategyFactory;
+        this.messagingTemplate = messagingTemplate;
     }
     
     private OrderBook getOrderBook(String symbol) {
@@ -79,10 +85,16 @@ public class OrderService {
             tradeRepository.save(trade);
             String restingOrderId = trade.getBuyOrderId().equals(order.getOrderId()) ? trade.getSellOrderId() : trade.getBuyOrderId();
             orderRepository.findById(restingOrderId).ifPresent(orderRepository::save);
+            
+            // Publish trade via WebSocket
+            messagingTemplate.convertAndSend("/topic/trades", trade);
         }
         
         // Save final state of incoming order
         orderRepository.save(order);
+        
+        // Publish OrderBook update
+        publishOrderBookUpdate(orderBook);
         
         return createOrderResponse(order, trades);
     }
@@ -110,6 +122,8 @@ public class OrderService {
         
         order.cancel();
         orderRepository.save(order); // Update status
+        
+        publishOrderBookUpdate(orderBook);
         
         return true;
     }
@@ -171,6 +185,19 @@ public class OrderService {
         if (request.getTraderId() == null || request.getTraderId().trim().isEmpty()) {
             throw new IllegalArgumentException("Trader ID is required");
         }
+    }
+    
+    private void publishOrderBookUpdate(OrderBook orderBook) {
+        // Simplified order book representation for WebSocket clients
+        Map<String, Object> update = new HashMap<>();
+        update.put("symbol", orderBook.getSymbol());
+        update.put("bestBid", orderBook.getBestBid());
+        update.put("bestAsk", orderBook.getBestAsk());
+        update.put("midPrice", orderBook.getMidPrice());
+        update.put("spread", orderBook.getSpread());
+        
+        messagingTemplate.convertAndSend("/topic/orderbook/" + orderBook.getSymbol(), (Object) update);
+        messagingTemplate.convertAndSend("/topic/orderbook", (Object) update);
     }
     
     private Order createOrderFromRequest(OrderRequest request) {
