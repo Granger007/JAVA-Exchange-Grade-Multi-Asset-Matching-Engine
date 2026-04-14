@@ -15,6 +15,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import com.tradingengine.strategy.MatchingStrategy;
+import com.tradingengine.strategy.MatchingStrategyFactory;
 
 /**
  * ORDER SERVICE - Business logic for order operations
@@ -30,15 +31,15 @@ public class OrderService {
     
     private final OrderRepository orderRepository;
     private final TradeRepository tradeRepository;
-    private final MatchingStrategy matchingStrategy;
+    private final MatchingStrategyFactory matchingStrategyFactory;
     
     private final Map<String, OrderBook> orderBooks = new ConcurrentHashMap<>();
     
     @Autowired
-    public OrderService(OrderRepository orderRepository, TradeRepository tradeRepository, MatchingStrategy matchingStrategy) {
+    public OrderService(OrderRepository orderRepository, TradeRepository tradeRepository, MatchingStrategyFactory matchingStrategyFactory) {
         this.orderRepository = orderRepository;
         this.tradeRepository = tradeRepository;
-        this.matchingStrategy = matchingStrategy;
+        this.matchingStrategyFactory = matchingStrategyFactory;
     }
     
     private OrderBook getOrderBook(String symbol) {
@@ -61,6 +62,7 @@ public class OrderService {
         OrderBook orderBook = getOrderBook(order.getSymbol());
         
         // Delegate to MatchingEngine/Strategy
+        MatchingStrategy matchingStrategy = matchingStrategyFactory.getStrategy("FIFO"); // Defaulting to FIFO for now
         List<Trade> trades = matchingStrategy.match(order, orderBook);
         
         if (order.getType() == OrderType.MARKET) {
