@@ -240,6 +240,9 @@
     <header>
         <h1>Aurora <span>Simulation Dashboard</span></h1>
         <div style="display: flex; gap: 1rem; align-items: center;">
+            <button id="restart-btn" style="background: var(--sell-color); color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; font-family: inherit; font-weight: 600; cursor: pointer; transition: opacity 0.2s;">
+                Restart Simulation
+            </button>
             <span style="color: var(--text-muted);">Active Target:</span>
             <select id="symbol-select" style="background: var(--panel-bg); color: white; border: 1px solid var(--border-color); padding: 0.4rem; border-radius: 4px; font-family: inherit;">
                 <option value="BTC-USD">BTC-USD</option>
@@ -250,8 +253,27 @@
 
     <div class="dashboard-grid">
         
-        <!-- Left Column: Agents -->
+        <!-- Left Column: Order Entry & Agents -->
         <div class="panel" style="grid-column: 1; grid-row: 1 / span 2;">
+            <div style="margin-bottom: 2rem;">
+                <h2>Manual Order Entry</h2>
+                <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                        <button id="buy-btn" style="background: var(--buy-color); color: white; border: none; padding: 0.6rem; border-radius: 4px; font-weight: 700; cursor: pointer;">BUY</button>
+                        <button id="sell-btn" style="background: var(--sell-color); color: white; border: none; padding: 0.6rem; border-radius: 4px; font-weight: 700; cursor: pointer;">SELL</button>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 0.4rem;">
+                        <label style="font-size: 0.75rem; color: var(--text-muted);">Price</label>
+                        <input type="number" id="order-price" step="0.01" style="background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); color: white; padding: 0.5rem; border-radius: 4px; font-family: 'Roboto Mono';">
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 0.4rem;">
+                        <label style="font-size: 0.75rem; color: var(--text-muted);">Quantity</label>
+                        <input type="number" id="order-qty" step="1" style="background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); color: white; padding: 0.5rem; border-radius: 4px; font-family: 'Roboto Mono';">
+                    </div>
+                    <div id="order-status" style="font-size: 0.75rem; min-height: 1rem; transition: opacity 0.3s;"></div>
+                </div>
+            </div>
+
             <h2>Simulation Agents</h2>
             <div class="agents-list" id="agents-container">
                 <!-- Injected via JS -->
@@ -337,6 +359,63 @@
             displayedTradeIds.clear();
             updateChart();
         });
+
+        document.getElementById('restart-btn').addEventListener('click', async () => {
+            if (confirm('Are you sure you want to restart the simulation? All data will be cleared.')) {
+                try {
+                    await fetch(`${API}/simulation/restart`, { method: 'POST' });
+                    chartData.labels = [];
+                    chartData.datasets[0].data = [];
+                    document.getElementById('log-stream').innerHTML = '';
+                    document.getElementById('feed-body').innerHTML = '';
+                    displayedTradeIds.clear();
+                    updateChart();
+                } catch (err) {
+                    console.error("Restart error: ", err);
+                }
+            }
+        });
+
+        const sendOrder = async (side) => {
+            const price = parseFloat(document.getElementById('order-price').value);
+            const quantity = parseInt(document.getElementById('order-qty').value);
+            const statusEl = document.getElementById('order-status');
+
+            if (!price || !quantity) {
+                statusEl.innerText = "Error: Invalid Price or Qty";
+                statusEl.style.color = "var(--sell-color)";
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API}/v1/trading/orders`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        symbol: currentSymbol,
+                        side: side,
+                        price: price,
+                        quantity: quantity,
+                        traderId: "Manual"
+                    })
+                });
+
+                if (res.ok) {
+                    statusEl.innerText = "Order placed successfully";
+                    statusEl.style.color = "var(--buy-color)";
+                    setTimeout(() => statusEl.innerText = "", 3000);
+                } else {
+                    statusEl.innerText = "Error: Server rejected order";
+                    statusEl.style.color = "var(--sell-color)";
+                }
+            } catch (err) {
+                statusEl.innerText = "Error: Network failure";
+                statusEl.style.color = "var(--sell-color)";
+            }
+        };
+
+        document.getElementById('buy-btn').addEventListener('click', () => sendOrder('BUY'));
+        document.getElementById('sell-btn').addEventListener('click', () => sendOrder('SELL'));
 
         // Chart.js Setup
         const ctx = document.getElementById('priceChart').getContext('2d');

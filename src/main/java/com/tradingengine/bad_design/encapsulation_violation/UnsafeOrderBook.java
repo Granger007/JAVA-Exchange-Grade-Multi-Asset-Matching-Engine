@@ -222,6 +222,7 @@ public class UnsafeOrderBook {
         maliciousOrder.price = -1.0; // Invalid price
         maliciousOrder.quantity = -1; // Invalid quantity
         maliciousOrder.symbol = "FAKE";
+        maliciousOrder.side = "BUY"; // Initialize side to prevent NPE in bad code
         
         orderBook.addOrder(maliciousOrder); // No validation prevents this
         

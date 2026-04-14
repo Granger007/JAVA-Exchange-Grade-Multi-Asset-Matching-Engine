@@ -2,7 +2,6 @@ package com.tradingengine.repository.impl;
 
 import com.tradingengine.domain.model.Order;
 import com.tradingengine.repository.OrderRepository;
-import org.springframework.stereotype.Repository;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;

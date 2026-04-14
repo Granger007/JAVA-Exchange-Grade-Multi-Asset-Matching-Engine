@@ -10,11 +10,11 @@ import java.util.List;
 public interface SpringDataOrderRepository extends JpaRepository<Order, String> {
     List<Order> findByTraderId(String traderId);
     
-    @Query("SELECT o FROM Order o WHERE o.symbol = :symbol AND (o.status = 'NEW' OR o.status = 'PARTIALLY_FILLED')")
+    @Query("SELECT o FROM Order o WHERE o.symbol = :symbol AND (o.status = com.tradingengine.domain.model.OrderStatus.NEW OR o.status = com.tradingengine.domain.model.OrderStatus.PARTIALLY_FILLED)")
     List<Order> findActiveOrdersBySymbol(@Param("symbol") String symbol);
     
     List<Order> findBySymbol(String symbol);
     
-    @Query("SELECT COUNT(o) FROM Order o WHERE o.status = :status")
+    @Query("SELECT COUNT(o) FROM Order o WHERE CAST(o.status AS string) = :status")
     long countByOrderStatus(@Param("status") String status);
 }

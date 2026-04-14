@@ -24,7 +24,7 @@ public class SimulationEngine {
     
     private final OrderService orderService;
     private final List<TradingAgent> agents;
-    private final ScheduledExecutorService scheduler;
+    private ScheduledExecutorService scheduler;
     
     @Autowired
     public SimulationEngine(OrderService orderService) {
@@ -125,6 +125,14 @@ public class SimulationEngine {
             Thread.currentThread().interrupt();
         }
         System.out.println("Simulation stopped.");
+    }
+
+    public void restartSimulation() {
+        stopSimulation();
+        agents.clear();
+        createAgents();
+        this.scheduler = Executors.newScheduledThreadPool(4);
+        startSimulation();
     }
     
     public List<TradingAgent> getAgents() {

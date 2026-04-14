@@ -15,6 +15,8 @@ import java.util.HashMap;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.ArrayList;
 import com.tradingengine.strategy.MatchingStrategy;
 import com.tradingengine.strategy.MatchingStrategyFactory;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -71,7 +73,7 @@ public class OrderService {
         orderRepository.save(order); // Save initial state
         
         if (order.getType() == OrderType.STOP_LOSS) {
-            stopOrders.computeIfAbsent(order.getSymbol(), k -> new java.util.concurrent.CopyOnWriteArrayList<>()).add(order);
+            stopOrders.computeIfAbsent(order.getSymbol(), k -> new CopyOnWriteArrayList<>()).add(order);
             return createOrderResponse(order, List.of());
         }
         
@@ -117,7 +119,7 @@ public class OrderService {
         List<Order> list = stopOrders.get(trade.getSymbol());
         if (list == null || list.isEmpty()) return;
         
-        List<Order> triggered = new java.util.ArrayList<>();
+        List<Order> triggered = new ArrayList<>();
         for (Order so : list) {
             if (!so.isActive()) continue;
             
@@ -199,6 +201,12 @@ public class OrderService {
                 .stream()
                 .map(this::createOrderResponse)
                 .toList();
+    }
+
+    public void clearAllOrders() {
+        orderRepository.deleteAll();
+        orderBooks.clear();
+        stopOrders.clear();
     }
     
     // Private helper methods
