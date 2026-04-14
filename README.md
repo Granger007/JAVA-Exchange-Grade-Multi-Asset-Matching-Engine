@@ -112,12 +112,18 @@ demo_runner/
 -  **Multi-Asset Support**: Extensible framework for equities, crypto, futures, options
 -  **Real-time Market Data**: Observer pattern for live price updates
 -  **Order Management**: Complete order lifecycle with proper state transitions
+-  **Stop Loss Orders**: Automatic order triggering based on price thresholds
+-  **Market Orders**: Immediate execution at best available market prices
+-  **Portfolio Management**: Real-time portfolio tracking with balance and position updates
 
 ### API & Monitoring
 -  **REST Endpoints**: Clean Spring Boot controllers with dependency injection
 -  **DTOs**: Proper request/response objects with validation
 -  **Error Handling**: Comprehensive exception management
 -  **Transaction Management**: ACID compliance for order processing
+-  **WebSocket Support**: Real-time updates via STOMP over WebSocket
+-  **Web Dashboard**: Aurora Simulation Dashboard with live trading visualization
+-  **Simulation API**: Dedicated endpoints for simulation control and monitoring
 
 ## 🏗️ Architecture
 
@@ -250,27 +256,65 @@ The application will start on `http://localhost:8080` and automatically begin th
 
 ### API Endpoints
 
-#### Place Order
+#### Trading API
 ```http
-POST /api/orders
+# Place Order
+POST /api/v1/trading/orders
 Content-Type: application/json
 
 {
   "symbol": "BTC-USD",
   "side": "BUY",
+  "type": "LIMIT",
   "price": 45000.0,
-  "quantity": 1.5
+  "quantity": 1.5,
+  "traderId": "trader1"
 }
+
+# Cancel Order
+DELETE /api/v1/trading/orders/{orderId}
+
+# Get Order Details
+GET /api/v1/trading/orders/{orderId}
+
+# Get Trader Orders
+GET /api/v1/trading/orders/trader/{traderId}
+
+# Get Active Orders
+GET /api/v1/trading/orders/active/{symbol}
 ```
 
-#### Get Order Book
+#### Simulation API
 ```http
-GET /api/orderbook/BTC-USD
+# Get Simulation Agents
+GET /api/simulation/agents
+
+# Get Simulation Status
+GET /api/simulation/status
+
+# Get Trades for Symbol
+GET /api/simulation/trades/{symbol}
+
+# Restart Simulation
+POST /api/simulation/restart
 ```
 
-#### Get Order Book (AAPL)
+#### Order Book API
 ```http
-GET /api/orderbook/AAPL
+GET /api/orderbook/{symbol}
+```
+
+#### WebSocket Endpoints
+```javascript
+// Connect for real-time updates
+const socket = new SockJS('/ws');
+const stompClient = Stomp.over(socket);
+
+// Subscribe to trades
+stompClient.subscribe('/topic/trades', callback);
+
+// Subscribe to order book updates
+stompClient.subscribe('/topic/orderbook/{symbol}', callback);
 ```
 
 ## 📊 Simulation Features
@@ -287,7 +331,25 @@ The application automatically starts with 8 trading agents:
 
 Each agent operates independently, placing orders based on their trading strategy and reacting to market data updates.
 
-## 🎓 Educational Value
+## � Web Dashboard
+
+The application includes a sophisticated **Aurora Simulation Dashboard** accessible at `http://localhost:8080`:
+
+### Dashboard Features
+- **Real-time Order Book**: Live bid/ask spreads with price levels
+- **Trade Feed**: Streaming trade executions with price and volume
+- **Agent Monitoring**: Track individual agent performance and portfolios
+- **Interactive Charts**: Price charts with technical indicators
+- **Market Statistics**: Real-time market metrics and analytics
+- **WebSocket Integration**: Live updates without page refresh
+
+### Technology Stack
+- **Frontend**: HTML5, CSS3, JavaScript with Chart.js
+- **Real-time Communication**: STOMP over WebSocket
+- **Responsive Design**: Mobile-friendly interface
+- **Modern UI**: Dark theme with gradient accents
+
+## �🎓 Educational Value
 
 This project serves as an excellent learning resource for:
 - **Design Patterns**: Real-world implementations of Strategy, Observer, and Builder patterns
@@ -306,14 +368,25 @@ This project serves as an excellent learning resource for:
 
 ## 🔮 Future Enhancements
 
+### Recently Implemented ✅
+- [x] **Stop Loss Orders**: Automatic order triggering based on price thresholds
+- [x] **Market Orders**: Immediate execution at best available market prices
+- [x] **WebSocket Support**: Real-time updates via STOMP over WebSocket
+- [x] **Web Dashboard**: Aurora Simulation Dashboard with live trading visualization
+- [x] **Portfolio Management**: Real-time portfolio tracking with balance and position updates
+- [x] **JPA Persistence**: Database integration with Spring Data JPA
+- [x] **Simulation API**: Dedicated endpoints for simulation control
+
+### Planned Enhancements 📋
 - [ ] Add more matching algorithms (Time-Weighted Average Price, Volume-Weighted Average Price)
-- [ ] Implement market orders and stop-loss orders
-- [ ] Add WebSocket support for real-time market data streaming
-- [ ] Implement persistence layer for trade history
+- [ ] Implement advanced order types (Iceberg, trailing stop, bracket orders)
 - [ ] Add authentication and authorization for API endpoints
 - [ ] Implement circuit breakers and market halts
 - [ ] Add comprehensive unit and integration tests
-- [ ] Implement monitoring and metrics collection
+- [ ] Implement monitoring and metrics collection with Prometheus
+- [ ] Add support for options and futures contracts
+- [ ] Implement market maker algorithms
+- [ ] Add historical data analysis and backtesting framework
 
 ---
 
