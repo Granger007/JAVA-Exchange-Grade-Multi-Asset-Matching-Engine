@@ -3,46 +3,46 @@
 ## MVC Architecture Diagram
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    VIEW LAYER                                │
+┌─────────────────────────────────────────────────────────┐
+│                    VIEW LAYER                           │
 │  ┌─────────────────┐  ┌─────────────────┐               │
 │  │   Web Dashboard │  │      DTOs       │               │
-│  │  (index.html)  │  │ OrderResponse   │               │
+│  │  (index.html)   │  │ OrderResponse   │               │
 │  │                 │  │ OrderBookView   │               │
 │  └─────────────────┘  │ OrderRequest    │               │
-│           ▲            └─────────────────┘               │
-│           │                        ▲                        │
-│           │                        │                        │
-└─────────────────────────────────────────────────────────────────┘
+│           ▲           └─────────────────┘               │
+│           │                        ▲                    │
+│           │                        │                    │
+└─────────────────────────────────────────────────────────┘
            │                        │
            │                        │
-┌─────────────────────────────────────────────────────────────────┐
-│                 CONTROLLER LAYER                            │
+┌────────────────────────────────────────────────────────┐
+│                 CONTROLLER LAYER                       │
+│  ┌────────────────-─┐  ┌─────────────────┐             │
+│  │ TradingController│  │SimulationCtrl   │             │
+│  │ OrderBookCtrl    │  │                 │             │
+│  └────────────────-─┘  └─────────────────┘             │
+│           │                        │                   │
+│           ▼                        ▼                   │
+└────────────────────────────────────────────────────────┘
+           │                        │
+           │                        │
+┌─────────────────────────────────────────────────────────┐
+│                  MODEL LAYER                            │
 │  ┌─────────────────┐  ┌─────────────────┐               │
-│  │ TradingController│  │SimulationCtrl   │               │
-│  │ OrderBookCtrl    │  │                 │               │
-│  └─────────────────┘  └─────────────────┘               │
-│           │                        │                        │
-│           ▼                        ▼                        │
-└─────────────────────────────────────────────────────────────────┘
-           │                        │
-           │                        │
-┌─────────────────────────────────────────────────────────────────┐
-│                  MODEL LAYER                               │
-│  ┌─────────────────┐  ┌─────────────────┐               │
-│  │   Services       │  │   Domain Models │               │
-│  │ OrderService     │  │ Order, Trade    │               │
-│  │ PortfolioService │  │ OrderBook      │               │
+│  │   Services      │  │   Domain Models │               │
+│  │ OrderService    │  │ Order, Trade    │               │
+│  │ PortfolioService|  |   OrderBook     │               │
 │  │                 │  │ PriceLevel      │               │
 │  └─────────────────┘  └─────────────────┘               │
-│           │                        │                        │
-│           ▼                        ▼                        │
+│           │                        │                    │
+│           ▼                        ▼                    │
 │  ┌─────────────────┐  ┌─────────────────┐               │
-│  │  Repositories    │  │  Simulation     │               │
-│  │ OrderRepository  │  │  Engine         │               │
-│  │ TradeRepository  │  │  TradingAgents  │               │
+│  │  Repositories   │  │  Simulation     │               │
+│  │ OrderRepository │  │  Engine         │               │
+│  │ TradeRepository │  │  TradingAgents  │               │
 │  └─────────────────┘  └─────────────────┘               │
-└─────────────────────────────────────────────────────────────────┘
+└─────────────────────────────────────────────────────────┘
 ```
 
 ## [MVC MAPPING]
@@ -159,4 +159,4 @@ The trading engine successfully implements a clean MVC architecture with proper 
 2. **View layer** manages presentation and data transfer without business logic
 3. **Controller layer** coordinates input/output and delegates to appropriate services
 
-The architecture enforces GRASP and SOLID principles while remaining practical and maintainable. All identified violations have been corrected to ensure proper MVC compliance.
+
