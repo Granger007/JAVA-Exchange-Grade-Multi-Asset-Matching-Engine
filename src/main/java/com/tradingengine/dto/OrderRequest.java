@@ -9,6 +9,7 @@ package com.tradingengine.dto;
 public class OrderRequest {
     private String symbol;
     private double price;
+    private double stopPrice = 0.0;
     private long quantity;
     private String side;  // "BUY" or "SELL"
     private String type = "LIMIT"; // "LIMIT" or "MARKET"
@@ -17,9 +18,10 @@ public class OrderRequest {
     // Default constructor for JSON deserialization
     public OrderRequest() {}
 
-    public OrderRequest(String symbol, double price, long quantity, String side, String type, String traderId) {
+    public OrderRequest(String symbol, double price, double stopPrice, long quantity, String side, String type, String traderId) {
         this.symbol = symbol;
         this.price = price;
+        this.stopPrice = stopPrice;
         this.quantity = quantity;
         this.side = side;
         this.type = type;
@@ -32,6 +34,9 @@ public class OrderRequest {
 
     public double getPrice() { return price; }
     public void setPrice(double price) { this.price = price; }
+
+    public double getStopPrice() { return stopPrice; }
+    public void setStopPrice(double stopPrice) { this.stopPrice = stopPrice; }
 
     public long getQuantity() { return quantity; }
     public void setQuantity(long quantity) { this.quantity = quantity; }
@@ -47,8 +52,8 @@ public class OrderRequest {
 
     @Override
     public String toString() {
-        return String.format("OrderRequest{symbol='%s', price=%.2f, quantity=%d, " +
+        return String.format("OrderRequest{symbol='%s', price=%.2f, stopPrice=%.2f, quantity=%d, " +
                            "side='%s', type='%s', traderId='%s'}",
-                           symbol, price, quantity, side, type, traderId);
+                           symbol, price, stopPrice, quantity, side, type, traderId);
     }
 }
