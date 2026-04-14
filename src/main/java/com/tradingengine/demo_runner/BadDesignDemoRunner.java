@@ -92,7 +92,7 @@ public class BadDesignDemoRunner {
         Map<String, Object> request = new HashMap<>();
         request.put("symbol", "AAPL");
         request.put("price", 150.25);
-        request.put("quantity", 100);
+        request.put("quantity", 100L);
         request.put("side", "BUY");
         request.put("traderId", "TRADER001");
         

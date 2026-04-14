@@ -2,7 +2,6 @@ package com.tradingengine.repository.impl;
 
 import com.tradingengine.domain.model.Trade;
 import com.tradingengine.repository.TradeRepository;
-import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
 import java.util.*;
@@ -88,5 +87,10 @@ public class InMemoryTradeRepository implements TradeRepository {
     @Override
     public boolean deleteById(String tradeId) {
         return trades.remove(tradeId) != null;
+    }
+
+    @Override
+    public void deleteAll() {
+        trades.clear();
     }
 }

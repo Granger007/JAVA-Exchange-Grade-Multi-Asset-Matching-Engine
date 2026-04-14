@@ -75,4 +75,9 @@ public class JpaTradeRepository implements TradeRepository {
         }
         return false;
     }
+
+    @Override
+    public void deleteAll() {
+        jpaRepository.deleteAll();
+    }
 }
