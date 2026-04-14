@@ -55,6 +55,8 @@ public class OrderService {
         return orderBooks.computeIfAbsent(symbol, OrderBook::new);
     }
     
+    private final Map<String, List<Order>> stopOrders = new ConcurrentHashMap<>();
+
     /**
      * Place new order
      * 
@@ -68,15 +70,22 @@ public class OrderService {
         Order order = createOrderFromRequest(request);
         orderRepository.save(order); // Save initial state
         
-        OrderBook orderBook = getOrderBook(order.getSymbol());
+        if (order.getType() == OrderType.STOP_LOSS) {
+            stopOrders.computeIfAbsent(order.getSymbol(), k -> new java.util.concurrent.CopyOnWriteArrayList<>()).add(order);
+            return createOrderResponse(order, List.of());
+        }
         
-        // Delegate to MatchingEngine/Strategy
+        List<Trade> trades = executeMatching(order);
+        return createOrderResponse(order, trades);
+    }
+    
+    private List<Trade> executeMatching(Order order) {
+        OrderBook orderBook = getOrderBook(order.getSymbol());
         MatchingStrategy matchingStrategy = matchingStrategyFactory.getStrategy("FIFO"); // Defaulting to FIFO for now
         List<Trade> trades = matchingStrategy.match(order, orderBook);
         
         if (order.getType() == OrderType.MARKET) {
             if (order.getQuantity() > 0 && order.isActive()) {
-                // Cancel remaining quantity for market orders
                 order.cancel(); 
             }
         } else if (order.isActive() && order.getQuantity() > 0) {
@@ -89,11 +98,10 @@ public class OrderService {
             String restingOrderId = trade.getBuyOrderId().equals(order.getOrderId()) ? trade.getSellOrderId() : trade.getBuyOrderId();
             orderRepository.findById(restingOrderId).ifPresent(orderRepository::save);
             
-            // Update Portfolios
             portfolioService.processTrade(trade);
-            
-            // Publish trade via WebSocket
             messagingTemplate.convertAndSend("/topic/trades", trade);
+            
+            checkStopOrders(trade);
         }
         
         // Save final state of incoming order
@@ -102,7 +110,29 @@ public class OrderService {
         // Publish OrderBook update
         publishOrderBookUpdate(orderBook);
         
-        return createOrderResponse(order, trades);
+        return trades;
+    }
+    
+    private void checkStopOrders(Trade trade) {
+        List<Order> list = stopOrders.get(trade.getSymbol());
+        if (list == null || list.isEmpty()) return;
+        
+        List<Order> triggered = new java.util.ArrayList<>();
+        for (Order so : list) {
+            if (!so.isActive()) continue;
+            
+            if (so.getSide() == OrderSide.SELL && trade.getPrice() <= so.getStopPrice()) {
+                triggered.add(so);
+            } else if (so.getSide() == OrderSide.BUY && trade.getPrice() >= so.getStopPrice()) {
+                triggered.add(so);
+            }
+        }
+        
+        for (Order so : triggered) {
+            list.remove(so);
+            so.convertToMarket();
+            executeMatching(so);
+        }
     }
     
     /**
@@ -218,6 +248,7 @@ public class OrderService {
             orderId,
             request.getSymbol(),
             request.getPrice(),
+            request.getStopPrice(),
             request.getQuantity(),
             OrderSide.valueOf(request.getSide().toUpperCase()),
             type,
@@ -234,6 +265,7 @@ public class OrderService {
             order.getOrderId(),
             order.getSymbol(),
             order.getPrice(),
+            order.getStopPrice(),
             order.getOriginalQuantity(), // Use original quantity to show what was requested
             order.getSide().toString(),
             order.getType().toString(),

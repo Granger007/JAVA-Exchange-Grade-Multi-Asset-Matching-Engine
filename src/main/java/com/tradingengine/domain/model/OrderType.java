@@ -5,5 +5,6 @@ package com.tradingengine.domain.model;
  */
 public enum OrderType {
     LIMIT,
-    MARKET
+    MARKET,
+    STOP_LOSS
 }

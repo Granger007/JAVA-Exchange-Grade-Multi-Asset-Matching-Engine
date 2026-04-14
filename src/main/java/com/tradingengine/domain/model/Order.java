@@ -23,6 +23,7 @@ public class Order {
     private String orderId;
     private String symbol;
     private double price;
+    private double stopPrice;
     private long originalQuantity;
     
     @Enumerated(EnumType.STRING)
@@ -43,13 +44,14 @@ public class Order {
     
     protected Order() {} // JPA requires no-arg constructor
 
-    public Order(String orderId, String symbol, double price, long quantity, 
+    public Order(String orderId, String symbol, double price, double stopPrice, long quantity, 
                  OrderSide side, OrderType type, String traderId) {
-        validateOrderData(orderId, symbol, price, quantity, side, type, traderId);
+        validateOrderData(orderId, symbol, price, stopPrice, quantity, side, type, traderId);
         
         this.orderId = orderId;
         this.symbol = symbol;
         this.price = type == OrderType.MARKET ? 0.0 : price; // Market orders can ignore price
+        this.stopPrice = stopPrice;
         this.originalQuantity = quantity;
         this.quantity = quantity;
         this.side = side;
@@ -89,9 +91,15 @@ public class Order {
         this.status = OrderStatus.REJECTED;
         this.lastModified = Instant.now();
     }
+    
+    public void convertToMarket() {
+        this.type = OrderType.MARKET;
+        this.price = 0.0;
+        this.lastModified = Instant.now();
+    }
 
     // Validation logic - Information Expert principle
-    private void validateOrderData(String orderId, String symbol, double price, 
+    private void validateOrderData(String orderId, String symbol, double price, double stopPrice,
                                   long quantity, OrderSide side, OrderType type, String traderId) {
         if (orderId == null || orderId.trim().isEmpty()) {
             throw new IllegalArgumentException("Order ID cannot be null or empty");
@@ -104,6 +112,9 @@ public class Order {
         }
         if (type == OrderType.LIMIT && price <= 0) {
             throw new IllegalArgumentException("Price must be positive for limit orders");
+        }
+        if (type == OrderType.STOP_LOSS && stopPrice <= 0) {
+            throw new IllegalArgumentException("Stop price must be positive for stop orders");
         }
         if (quantity <= 0) {
             throw new IllegalArgumentException("Quantity must be positive");
@@ -132,6 +143,7 @@ public class Order {
     public String getOrderId() { return orderId; }
     public String getSymbol() { return symbol; }
     public double getPrice() { return price; }
+    public double getStopPrice() { return stopPrice; }
     public long getQuantity() { return quantity; }
     public long getOriginalQuantity() { return originalQuantity; }
     public OrderSide getSide() { return side; }
@@ -163,8 +175,8 @@ public class Order {
 
     @Override
     public String toString() {
-        return String.format("Order{id='%s', symbol='%s', side=%s, type=%s, price=%.2f, " +
+        return String.format("Order{id='%s', symbol='%s', side=%s, type=%s, price=%.2f, stopPrice=%.2f, " +
                            "quantity=%d, originalQuantity=%d, status=%s, trader='%s'}",
-                           orderId, symbol, side, type, price, quantity, originalQuantity, status, traderId);
+                           orderId, symbol, side, type, price, stopPrice, quantity, originalQuantity, status, traderId);
     }
 }
