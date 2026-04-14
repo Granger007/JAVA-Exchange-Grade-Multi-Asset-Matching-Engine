@@ -53,4 +53,9 @@ public interface OrderRepository {
      * Check if order exists
      */
     boolean existsById(String orderId);
+    
+    /**
+     * Delete all orders
+     */
+    void deleteAll();
 }

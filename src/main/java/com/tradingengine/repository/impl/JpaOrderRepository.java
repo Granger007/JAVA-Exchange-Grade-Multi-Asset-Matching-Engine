@@ -59,4 +59,9 @@ public class JpaOrderRepository implements OrderRepository {
     public boolean existsById(String orderId) {
         return jpaRepository.existsById(orderId);
     }
+    
+    @Override
+    public void deleteAll() {
+        jpaRepository.deleteAll();
+    }
 }

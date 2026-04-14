@@ -65,4 +65,9 @@ public class InMemoryOrderRepository implements OrderRepository {
     public boolean existsById(String orderId) {
         return orders.containsKey(orderId);
     }
+    
+    @Override
+    public void deleteAll() {
+        orders.clear();
+    }
 }
