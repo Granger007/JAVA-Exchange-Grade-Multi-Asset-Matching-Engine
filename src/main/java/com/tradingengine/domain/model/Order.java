@@ -14,7 +14,9 @@ public class Order {
     private final String orderId;
     private final String symbol;
     private final double price;
+    private final long originalQuantity;
     private final OrderSide side;
+    private final OrderType type;
     private final String traderId;
     private final Instant createdAt;
     
@@ -23,14 +25,16 @@ public class Order {
     private Instant lastModified;
 
     public Order(String orderId, String symbol, double price, long quantity, 
-                 OrderSide side, String traderId) {
-        validateOrderData(orderId, symbol, price, quantity, side, traderId);
+                 OrderSide side, OrderType type, String traderId) {
+        validateOrderData(orderId, symbol, price, quantity, side, type, traderId);
         
         this.orderId = orderId;
         this.symbol = symbol;
-        this.price = price;
+        this.price = type == OrderType.MARKET ? 0.0 : price; // Market orders can ignore price
+        this.originalQuantity = quantity;
         this.quantity = quantity;
         this.side = side;
+        this.type = type;
         this.traderId = traderId;
         this.status = OrderStatus.NEW;
         this.createdAt = Instant.now();
@@ -69,15 +73,18 @@ public class Order {
 
     // Validation logic - Information Expert principle
     private void validateOrderData(String orderId, String symbol, double price, 
-                                  long quantity, OrderSide side, String traderId) {
+                                  long quantity, OrderSide side, OrderType type, String traderId) {
         if (orderId == null || orderId.trim().isEmpty()) {
             throw new IllegalArgumentException("Order ID cannot be null or empty");
         }
         if (symbol == null || symbol.trim().isEmpty()) {
             throw new IllegalArgumentException("Symbol cannot be null or empty");
         }
-        if (price <= 0) {
-            throw new IllegalArgumentException("Price must be positive");
+        if (type == null) {
+            throw new IllegalArgumentException("Order type cannot be null");
+        }
+        if (type == OrderType.LIMIT && price <= 0) {
+            throw new IllegalArgumentException("Price must be positive for limit orders");
         }
         if (quantity <= 0) {
             throw new IllegalArgumentException("Quantity must be positive");
@@ -107,7 +114,9 @@ public class Order {
     public String getSymbol() { return symbol; }
     public double getPrice() { return price; }
     public long getQuantity() { return quantity; }
+    public long getOriginalQuantity() { return originalQuantity; }
     public OrderSide getSide() { return side; }
+    public OrderType getType() { return type; }
     public String getTraderId() { return traderId; }
     public OrderStatus getStatus() { return status; }
     public Instant getCreatedAt() { return createdAt; }
@@ -135,8 +144,8 @@ public class Order {
 
     @Override
     public String toString() {
-        return String.format("Order{id='%s', symbol='%s', side=%s, price=%.2f, " +
-                           "quantity=%d, status=%s, trader='%s'}",
-                           orderId, symbol, side, price, quantity, status, traderId);
+        return String.format("Order{id='%s', symbol='%s', side=%s, type=%s, price=%.2f, " +
+                           "quantity=%d, originalQuantity=%d, status=%s, trader='%s'}",
+                           orderId, symbol, side, type, price, quantity, originalQuantity, status, traderId);
     }
 }

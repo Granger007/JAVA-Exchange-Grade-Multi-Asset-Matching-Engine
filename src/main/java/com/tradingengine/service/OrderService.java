@@ -63,7 +63,12 @@ public class OrderService {
         // Delegate to MatchingEngine/Strategy
         List<Trade> trades = matchingStrategy.match(order, orderBook);
         
-        if (order.isActive() && order.getQuantity() > 0) {
+        if (order.getType() == OrderType.MARKET) {
+            if (order.getQuantity() > 0 && order.isActive()) {
+                // Cancel remaining quantity for market orders
+                order.cancel(); 
+            }
+        } else if (order.isActive() && order.getQuantity() > 0) {
             orderBook.addOrder(order);
         }
         
@@ -168,12 +173,19 @@ public class OrderService {
     
     private Order createOrderFromRequest(OrderRequest request) {
         String orderId = UUID.randomUUID().toString();
+        
+        OrderType type = OrderType.LIMIT;
+        if (request.getType() != null && !request.getType().trim().isEmpty()) {
+            type = OrderType.valueOf(request.getType().toUpperCase());
+        }
+        
         return new Order(
             orderId,
             request.getSymbol(),
             request.getPrice(),
             request.getQuantity(),
             OrderSide.valueOf(request.getSide().toUpperCase()),
+            type,
             request.getTraderId()
         );
     }
@@ -187,8 +199,9 @@ public class OrderService {
             order.getOrderId(),
             order.getSymbol(),
             order.getPrice(),
-            order.getQuantity(),
+            order.getOriginalQuantity(), // Use original quantity to show what was requested
             order.getSide().toString(),
+            order.getType().toString(),
             order.getStatus().toString(),
             order.getTraderId(),
             order.getCreatedAt(),

@@ -74,6 +74,10 @@ public class FIFOMatchingStrategy implements MatchingStrategy {
     }
     
     private boolean canMatchAtPrice(Order incomingOrder, double price) {
+        if (incomingOrder.getType() == OrderType.MARKET) {
+            return true; // Market orders match at any available price
+        }
+        
         if (incomingOrder.getSide() == OrderSide.BUY) {
             return incomingOrder.getPrice() >= price; // Buy order matches at or below limit
         } else {
