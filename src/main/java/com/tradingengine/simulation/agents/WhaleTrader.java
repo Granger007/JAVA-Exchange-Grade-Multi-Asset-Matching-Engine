@@ -27,16 +27,31 @@ public class WhaleTrader extends TradingAgent {
         if (!active) return;
         
         // Whales trade less frequently but with larger volumes
-        if (random.nextDouble() < 0.05) { // 5% chance to trade
+        if (random.nextDouble() < 0.1) { // 10% chance to trade
             boolean buy = random.nextBoolean();
+            boolean aggressive = random.nextDouble() < 0.45; // 45% chance of aggressive order that will match
             
             if (buy) {
-                double price = generatePrice(basePrice, maxSpread * 0.3); // Tighter spread
+                double price;
+                if (aggressive) {
+                    // VERY Aggressive: Buy at a price way above base to guarantee matching asks
+                    price = basePrice + (maxSpread * 1.0);
+                } else {
+                    // Passive: Buy below base price to add to bids
+                    price = basePrice - (random.nextDouble() * maxSpread * 0.45);
+                }
                 long quantity = generateQuantity(1000, maxQuantity);
                 placeBuyOrder(price, quantity);
                 System.out.println(name + " (WHALE) placed LARGE BUY order: " + quantity + " @ " + price);
             } else {
-                double price = generatePrice(basePrice, maxSpread * 0.3); // Tighter spread
+                double price;
+                if (aggressive) {
+                    // VERY Aggressive: Sell at a price way below base to guarantee matching bids
+                    price = basePrice - (maxSpread * 1.0);
+                } else {
+                    // Passive: Sell above base price to add to asks
+                    price = basePrice + (random.nextDouble() * maxSpread * 0.45);
+                }
                 long quantity = generateQuantity(1000, maxQuantity);
                 placeSellOrder(price, quantity);
                 System.out.println(name + " (WHALE) placed LARGE SELL order: " + quantity + " @ " + price);
