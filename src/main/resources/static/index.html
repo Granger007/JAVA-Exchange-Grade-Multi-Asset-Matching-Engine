@@ -239,15 +239,37 @@
 
     <header>
         <h1>Aurora <span>Simulation Dashboard</span></h1>
-        <div style="display: flex; gap: 1rem; align-items: center;">
-            <button id="restart-btn" style="background: var(--sell-color); color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; font-family: inherit; font-weight: 600; cursor: pointer; transition: opacity 0.2s;">
-                Restart Simulation
+        <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <span style="color: var(--text-muted);">Symbol:</span>
+                <select id="symbol-select" style="background: var(--panel-bg); color: white; border: 1px solid var(--border-color); padding: 0.4rem; border-radius: 4px; font-family: inherit;">
+                    <option value="BTC-USD">BTC-USD</option>
+                    <option value="AAPL">AAPL</option>
+                </select>
+            </div>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <span style="color: var(--text-muted);">Strategy:</span>
+                <button id="strategy-fifo" class="strategy-btn active" style="background: var(--primary); color: white; border: 1px solid var(--primary); padding: 0.4rem 0.8rem; border-radius: 4px; font-family: inherit; font-weight: 600; cursor: pointer;">
+                    FIFO
+                </button>
+                <button id="strategy-prorata" class="strategy-btn" style="background: transparent; color: var(--text-muted); border: 1px solid var(--border-color); padding: 0.4rem 0.8rem; border-radius: 4px; font-family: inherit; font-weight: 600; cursor: pointer;">
+                    Pro-Rata
+                </button>
+            </div>
+            <div style="display: flex; gap: 0.5rem;">
+                <button id="btn-get-agents" class="api-btn" style="background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: 1px solid var(--primary); padding: 0.4rem 0.8rem; border-radius: 4px; font-family: inherit; font-weight: 600; cursor: pointer; font-size: 0.8rem;">
+                    🔍 Get Agents
+                </button>
+                <button id="btn-get-orderbook" class="api-btn" style="background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid var(--buy-color); padding: 0.4rem 0.8rem; border-radius: 4px; font-family: inherit; font-weight: 600; cursor: pointer; font-size: 0.8rem;">
+                    📊 Get OrderBook
+                </button>
+                <button id="btn-get-trades" class="api-btn" style="background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid var(--sell-color); padding: 0.4rem 0.8rem; border-radius: 4px; font-family: inherit; font-weight: 600; cursor: pointer; font-size: 0.8rem;">
+                    💹 Get Trades
+                </button>
+            </div>
+            <button id="restart-btn" style="background: var(--sell-color); color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; font-family: inherit; font-weight: 600; cursor: pointer;">
+                🔄 Restart
             </button>
-            <span style="color: var(--text-muted);">Active Target:</span>
-            <select id="symbol-select" style="background: var(--panel-bg); color: white; border: 1px solid var(--border-color); padding: 0.4rem; border-radius: 4px; font-family: inherit;">
-                <option value="BTC-USD">BTC-USD</option>
-                <option value="AAPL">AAPL</option>
-            </select>
         </div>
     </header>
 
@@ -585,7 +607,369 @@
             });
         }
 
+        // Strategy selection buttons
+        async function updateStrategyButtons() {
+            try {
+                const res = await fetch(`${API}/simulation/strategy/${currentSymbol}`);
+                const data = await res.json();
+                const strategy = data.strategy.toUpperCase();
+                
+                document.getElementById('strategy-fifo').classList.toggle('active', strategy === 'FIFO');
+                document.getElementById('strategy-prorata').classList.toggle('active', strategy === 'PRORATA');
+                
+                if (strategy === 'FIFO') {
+                    document.getElementById('strategy-fifo').style.background = 'var(--primary)';
+                    document.getElementById('strategy-fifo').style.color = 'white';
+                    document.getElementById('strategy-fifo').style.borderColor = 'var(--primary)';
+                    document.getElementById('strategy-prorata').style.background = 'transparent';
+                    document.getElementById('strategy-prorata').style.color = 'var(--text-muted)';
+                    document.getElementById('strategy-prorata').style.borderColor = 'var(--border-color)';
+                } else {
+                    document.getElementById('strategy-prorata').style.background = 'var(--primary)';
+                    document.getElementById('strategy-prorata').style.color = 'white';
+                    document.getElementById('strategy-prorata').style.borderColor = 'var(--primary)';
+                    document.getElementById('strategy-fifo').style.background = 'transparent';
+                    document.getElementById('strategy-fifo').style.color = 'var(--text-muted)';
+                    document.getElementById('strategy-fifo').style.borderColor = 'var(--border-color)';
+                }
+            } catch (err) {
+                console.error('Strategy fetch error:', err);
+            }
+        }
 
+        document.getElementById('strategy-fifo').addEventListener('click', async () => {
+            try {
+                await fetch(`${API}/simulation/strategy/${currentSymbol}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ strategy: 'FIFO' })
+                });
+                updateStrategyButtons();
+            } catch (err) {
+                console.error('Strategy set error:', err);
+            }
+        });
+
+        document.getElementById('strategy-prorata').addEventListener('click', async () => {
+            try {
+                await fetch(`${API}/simulation/strategy/${currentSymbol}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ strategy: 'PRORATA' })
+                });
+                updateStrategyButtons();
+            } catch (err) {
+                console.error('Strategy set error:', err);
+            }
+        });
+
+        // Helper to open data in new window
+        function openDataWindow(title, data) {
+            const newWindow = window.open('', '_blank');
+            
+            let content = '';
+            if (title.includes('Trades') && Array.isArray(data) && data.length > 0) {
+                content = renderTradesTable(data);
+            } else if (title.includes('Agents') && Array.isArray(data) && data.length > 0) {
+                content = renderAgentsTable(data);
+            } else if (title.includes('Order Book') && data.bids && data.asks) {
+                content = renderOrderBookTable(data);
+            } else {
+                content = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+            }
+            
+            newWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>${title}</title>
+                    <style>
+                        * { box-sizing: border-box; }
+                        body { 
+                            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                            background: #0b0f19;
+                            color: #f8fafc;
+                            padding: 2rem;
+                            margin: 0;
+                            line-height: 1.6;
+                        }
+                        h1 { 
+                            color: #60a5fa; 
+                            margin-bottom: 1.5rem;
+                            border-bottom: 2px solid rgba(59, 130, 246, 0.3);
+                            padding-bottom: 0.75rem;
+                            font-size: 1.75rem;
+                        }
+                        .stats {
+                            display: flex;
+                            gap: 1rem;
+                            margin-bottom: 1.5rem;
+                            flex-wrap: wrap;
+                        }
+                        .stat-card {
+                            background: rgba(16, 22, 35, 0.85);
+                            border: 1px solid rgba(255, 255, 255, 0.1);
+                            border-radius: 8px;
+                            padding: 1rem 1.5rem;
+                        }
+                        .stat-label {
+                            color: #94a3b8;
+                            font-size: 0.875rem;
+                            margin-bottom: 0.25rem;
+                        }
+                        .stat-value {
+                            color: #f8fafc;
+                            font-size: 1.5rem;
+                            font-weight: 700;
+                        }
+                        table {
+                            width: 100%;
+                            border-collapse: separate;
+                            border-spacing: 0;
+                            background: rgba(16, 22, 35, 0.85);
+                            border: 1px solid rgba(255, 255, 255, 0.1);
+                            border-radius: 12px;
+                            overflow: hidden;
+                        }
+                        th, td {
+                            padding: 0.875rem 1.25rem;
+                            text-align: left;
+                            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+                        }
+                        th {
+                            background: rgba(59, 130, 246, 0.15);
+                            color: #60a5fa;
+                            font-weight: 600;
+                            text-transform: uppercase;
+                            font-size: 0.75rem;
+                            letter-spacing: 0.05em;
+                        }
+                        tr:last-child td {
+                            border-bottom: none;
+                        }
+                        tr:hover td {
+                            background: rgba(255, 255, 255, 0.02);
+                        }
+                        .price-buy { color: #34d399; font-weight: 600; }
+                        .price-sell { color: #f87171; font-weight: 600; }
+                        .quantity { font-weight: 600; }
+                        .timestamp { color: #94a3b8; font-size: 0.875rem; font-family: 'Courier New', monospace; }
+                        .agent-name { font-weight: 600; }
+                        .trader-id { font-family: 'Courier New', monospace; font-size: 0.8rem; color: #94a3b8; }
+                        pre { 
+                            background: rgba(16, 22, 35, 0.85);
+                            border: 1px solid rgba(255, 255, 255, 0.1);
+                            border-radius: 8px;
+                            padding: 1.5rem;
+                            overflow-x: auto;
+                            font-size: 0.9rem;
+                            line-height: 1.6;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <h1>${title}</h1>
+                    ${content}
+                </body>
+                </html>
+            `);
+            newWindow.document.close();
+        }
+        
+        function renderTradesTable(trades) {
+            const totalQty = trades.reduce((sum, t) => sum + t.quantity, 0);
+            const totalValue = trades.reduce((sum, t) => sum + (t.quantity * t.price), 0);
+            
+            let rows = trades.reverse().map(trade => {
+                const time = new Date(trade.timestamp).toLocaleString();
+                return `
+                    <tr>
+                        <td class="timestamp">${time}</td>
+                        <td class="quantity">${trade.quantity.toLocaleString()}</td>
+                        <td class="price-buy">$${trade.price.toFixed(2)}</td>
+                        <td>$${(trade.quantity * trade.price).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                        <td>
+                            <span class="agent-name">${trade.buyerTraderId || trade.buyTraderId}</span>
+                            <div class="trader-id">${trade.buyOrderId?.substring(0, 8) || ''}</div>
+                        </td>
+                        <td>
+                            <span class="agent-name">${trade.sellerTraderId || trade.sellTraderId}</span>
+                            <div class="trader-id">${trade.sellOrderId?.substring(0, 8) || ''}</div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+            
+            return `
+                <div class="stats">
+                    <div class="stat-card">
+                        <div class="stat-label">Total Trades</div>
+                        <div class="stat-value">${trades.length.toLocaleString()}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Total Quantity</div>
+                        <div class="stat-value">${totalQty.toLocaleString()}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Total Volume</div>
+                        <div class="stat-value">$${totalValue.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
+                    </div>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Qty</th>
+                            <th>Price</th>
+                            <th>Value</th>
+                            <th>Buyer</th>
+                            <th>Seller</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rows}
+                    </tbody>
+                </table>
+            `;
+        }
+        
+        function renderAgentsTable(agents) {
+            let rows = agents.map(agent => `
+                <tr>
+                    <td class="agent-name">${agent.id}</td>
+                    <td class="${agent.active ? 'price-buy' : 'price-sell'}">${agent.active ? 'Active' : 'Inactive'}</td>
+                    <td class="quantity">${agent.symbol}</td>
+                    <td class="quantity">${agent.tradeCount || 0}</td>
+                    <td class="${(agent.pnl || 0) >= 0 ? 'price-buy' : 'price-sell'}">
+                        $${(agent.pnl || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                    </td>
+                    <td class="quantity">${agent.position || 0}</td>
+                </tr>
+            `).join('');
+            
+            return `
+                <div class="stats">
+                    <div class="stat-card">
+                        <div class="stat-label">Total Agents</div>
+                        <div class="stat-value">${agents.length}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Active Agents</div>
+                        <div class="stat-value" style="color: #34d399">${agents.filter(a => a.active).length}</div>
+                    </div>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Agent ID</th>
+                            <th>Status</th>
+                            <th>Symbol</th>
+                            <th>Trade Count</th>
+                            <th>P&L</th>
+                            <th>Position</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rows}
+                    </tbody>
+                </table>
+            `;
+        }
+        
+        function renderOrderBookTable(snapshot) {
+            const sortedBids = snapshot.bids.sort((a,b) => b.price - a.price);
+            const sortedAsks = snapshot.asks.sort((a,b) => a.price - b.price);
+            
+            const maxRows = Math.max(sortedBids.length, sortedAsks.length, 15);
+            
+            let rows = '';
+            for (let i = 0; i < maxRows; i++) {
+                const bid = sortedBids[i];
+                const ask = sortedAsks[i];
+                rows += `
+                    <tr>
+                        <td class="quantity">${bid ? bid.totalQuantity.toLocaleString() : ''}</td>
+                        <td class="price-buy">${bid ? bid.price.toFixed(2) : ''}</td>
+                        <td style="text-align: center; color: #60a5fa; font-weight: 700; font-size: 1.1rem;">${i === 0 ? '●' : ''}</td>
+                        <td class="price-sell">${ask ? ask.price.toFixed(2) : ''}</td>
+                        <td class="quantity">${ask ? ask.totalQuantity.toLocaleString() : ''}</td>
+                    </tr>
+                `;
+            }
+            
+            return `
+                <div class="stats">
+                    <div class="stat-card">
+                        <div class="stat-label">Bid Levels</div>
+                        <div class="stat-value" style="color: #34d399">${sortedBids.length}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Ask Levels</div>
+                        <div class="stat-value" style="color: #f87171">${sortedAsks.length}</div>
+                    </div>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Bid Qty</th>
+                            <th>Bid Price</th>
+                            <th style="text-align: center;"></th>
+                            <th>Ask Price</th>
+                            <th>Ask Qty</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rows}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        // API test buttons
+        document.getElementById('btn-get-agents').addEventListener('click', async () => {
+            try {
+                const res = await fetch(`${API}/simulation/agents`);
+                const data = await res.json();
+                openDataWindow('Trading Agents', data);
+            } catch (err) {
+                alert('Error fetching agents: ' + err.message);
+            }
+        });
+
+        document.getElementById('btn-get-orderbook').addEventListener('click', async () => {
+            try {
+                const res = await fetch(`${API}/orderbook/${currentSymbol}`);
+                const data = await res.json();
+                openDataWindow(`Order Book - ${currentSymbol}`, data);
+            } catch (err) {
+                alert('Error fetching order book: ' + err.message);
+            }
+        });
+
+        document.getElementById('btn-get-trades').addEventListener('click', async () => {
+            try {
+                const res = await fetch(`${API}/simulation/trades/${currentSymbol}`);
+                const data = await res.json();
+                openDataWindow(`Recent Trades - ${currentSymbol}`, data);
+            } catch (err) {
+                alert('Error fetching trades: ' + err.message);
+            }
+        });
+
+        // Initialize strategy buttons on symbol change
+        document.getElementById('symbol-select').addEventListener('change', (e) => {
+            currentSymbol = e.target.value;
+            chartData.labels = [];
+            chartData.datasets[0].data = [];
+            document.getElementById('log-stream').innerHTML = ''; 
+            document.getElementById('feed-body').innerHTML = ''; 
+            displayedTradeIds.clear();
+            updateChart();
+            updateStrategyButtons();
+        });
+
+        // Initialize strategy buttons on load
+        updateStrategyButtons();
 
         setInterval(fetchSimulationData, 1000);
         fetchSimulationData();
