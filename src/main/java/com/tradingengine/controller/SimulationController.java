@@ -119,4 +119,41 @@ public class SimulationController {
         simulationEngine.restartSimulation();
         return ResponseEntity.ok().build();
     }
+    
+    /**
+     * Get current matching strategy for a symbol
+     */
+    @GetMapping("/strategy/{symbol}")
+    public ResponseEntity<Map<String, String>> getStrategy(@PathVariable String symbol) {
+        Map<String, String> result = new HashMap<>();
+        result.put("symbol", symbol);
+        result.put("strategy", orderService.getStrategyForSymbol(symbol));
+        return ResponseEntity.ok(result);
+    }
+    
+    /**
+     * Set matching strategy for a symbol
+     */
+    @PostMapping("/strategy/{symbol}")
+    public ResponseEntity<Map<String, String>> setStrategy(
+            @PathVariable String symbol, 
+            @RequestBody Map<String, String> request) {
+        String strategy = request.get("strategy");
+        if (strategy == null || (!strategy.equalsIgnoreCase("FIFO") && !strategy.equalsIgnoreCase("PRORATA"))) {
+            return ResponseEntity.badRequest().build();
+        }
+        orderService.setStrategyForSymbol(symbol, strategy);
+        Map<String, String> result = new HashMap<>();
+        result.put("symbol", symbol);
+        result.put("strategy", orderService.getStrategyForSymbol(symbol));
+        return ResponseEntity.ok(result);
+    }
+    
+    /**
+     * Get all strategies
+     */
+    @GetMapping("/strategies")
+    public ResponseEntity<Map<String, String>> getAllStrategies() {
+        return ResponseEntity.ok(orderService.getAllStrategies());
+    }
 }

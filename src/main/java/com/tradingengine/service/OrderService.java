@@ -41,6 +41,7 @@ public class OrderService {
     private final PortfolioService portfolioService;
     
     private final Map<String, OrderBook> orderBooks = new ConcurrentHashMap<>();
+    private final Map<String, String> symbolStrategies = new ConcurrentHashMap<>();
     
     @Autowired
     public OrderService(OrderRepository orderRepository, TradeRepository tradeRepository, 
@@ -82,9 +83,25 @@ public class OrderService {
         return createOrderResponse(order, trades);
     }
     
+    public void setStrategyForSymbol(String symbol, String strategyName) {
+        symbolStrategies.put(symbol, strategyName.toUpperCase());
+    }
+    
+    public String getStrategyForSymbol(String symbol) {
+        return symbolStrategies.getOrDefault(symbol, "FIFO");
+    }
+    
+    public Map<String, String> getAllStrategies() {
+        Map<String, String> result = new HashMap<>();
+        result.put("BTC-USD", getStrategyForSymbol("BTC-USD"));
+        result.put("AAPL", getStrategyForSymbol("AAPL"));
+        return result;
+    }
+    
     private List<Trade> executeMatching(Order order) {
         OrderBook orderBook = getOrderBook(order.getSymbol());
-        MatchingStrategy matchingStrategy = matchingStrategyFactory.getStrategy("FIFO"); // Defaulting to FIFO for now
+        String strategyName = getStrategyForSymbol(order.getSymbol());
+        MatchingStrategy matchingStrategy = matchingStrategyFactory.getStrategy(strategyName);
         List<Trade> trades = matchingStrategy.match(order, orderBook);
         
         if (order.getType() == OrderType.MARKET) {
